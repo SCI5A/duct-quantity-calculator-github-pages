@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Duct Quantity Calculator</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,Tahoma,sans-serif;background:#f4f7fb;color:#182230}
+header{background:#12355b;color:#fff;padding:22px 16px;text-align:center}header h1{margin:0 0 6px;font-size:25px}header p{margin:0;opacity:.85}
+main{max-width:1100px;margin:20px auto;padding:0 14px}.card{background:#fff;border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 4px 18px #0000000d}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+label{font-weight:700;font-size:13px;display:block;margin-bottom:6px}input,select,button{width:100%;padding:11px;border:1px solid #ccd5df;border-radius:9px;font-size:15px}input:focus,select:focus{outline:2px solid #8ab6df}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.actions button{width:auto;min-width:130px;cursor:pointer;border:0;font-weight:700}
+.primary{background:#1677c8;color:white}.secondary{background:#e8eef5;color:#18344f}.danger{background:#d9534f;color:#fff}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}.metric{background:#f0f6fc;padding:14px;border-radius:10px}.metric small{display:block;color:#617286}.metric strong{font-size:22px;display:block;margin-top:5px}
+.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:900px}th,td{padding:9px;border-bottom:1px solid #e4e9ef;text-align:center}th{background:#eef3f8}td button{width:auto;padding:6px 10px}
+.note{font-size:12px;color:#657486;margin-top:8px}
+footer{text-align:center;padding:20px;color:#6d7a88;font-size:12px}
+@media(max-width:600px){header h1{font-size:21px}.card{padding:13px}}
+</style>
+</head>
+<body>
+<header>
+<h1>حاسبة كميات مجاري الهواء</h1>
+<p>Duct Quantity Calculator</p>
+</header>
+<main>
+<section class="card">
+<h2>إضافة بند</h2>
+<div class="grid">
+<div><label>نوع الدكت</label><select id="type"><option value="rect">مستطيل Rectangular</option><option value="round">دائري Round</option></select></div>
+<div><label>العرض W (mm)</label><input id="w" type="number" min="0" step="1" placeholder="1000"></div>
+<div><label>الارتفاع H (mm)</label><input id="h" type="number" min="0" step="1" placeholder="500"></div>
+<div><label>القطر D (mm) - للدائري</label><input id="d" type="number" min="0" step="1" placeholder="500"></div>
+<div><label>الطول L (m)</label><input id="l" type="number" min="0" step="0.01" placeholder="10"></div>
+<div><label>العدد</label><input id="qty" type="number" min="1" step="1" value="1"></div>
+<div><label>سماكة الصاج (mm)</label><input id="thickness" type="number" min="0" step="0.1" value="0.8"></div>
+<div><label>الهالك (%)</label><input id="waste" type="number" min="0" step="0.1" value="10"></div>
+<div><label>العزل (mm)</label><input id="insulation" type="number" min="0" step="1" value="25"></div>
+</div>
+<div class="actions">
+<button class="primary" onclick="addItem()">إضافة وحساب</button>
+<button class="secondary" onclick="clearForm()">مسح الحقول</button>
+<button class="danger" onclick="clearAll()">حذف الكل</button>
+</div>
+<div class="note">للدكت المستطيل: المساحة = 2 × (W + H) × L. للدكت الدائري: المساحة = π × D × L. الأبعاد بالملليمتر والطول بالمتر.</div>
+</section>
+
+<section class="card">
+<h2>الإجماليات</h2>
+<div class="summary">
+<div class="metric"><small>عدد البنود</small><strong id="mItems">0</strong></div>
+<div class="metric"><small>إجمالي الطول</small><strong id="mLength">0.00 m</strong></div>
+<div class="metric"><small>مساحة الدكت</small><strong id="mArea">0.00 m²</strong></div>
+<div class="metric"><small>الهالك</small><strong id="mWaste">0.00 m²</strong></div>
+<div class="metric"><small>الإجمالي مع الهالك</small><strong id="mTotal">0.00 m²</strong></div>
+<div class="metric"><small>العزل التقريبي</small><strong id="mIns">0.00 m²</strong></div>
+<div class="metric"><small>وزن الصاج التقريبي</small><strong id="mWeight">0.00 kg</strong></div>
+</div>
+<div class="actions">
+<button class="secondary" onclick="exportCSV()">تصدير CSV</button>
+<button class="secondary" onclick="window.print()">طباعة / PDF</button>
+</div>
+</section>
+
+<section class="card">
+<h2>جدول الكميات</h2>
+<div class="table-wrap">
+<table>
+<thead><tr><th>#</th><th>النوع</th><th>المقاس</th><th>الطول</th><th>العدد</th><th>المساحة m²</th><th>الهالك m²</th><th>الإجمالي m²</th><th>العزل m²</th><th>الوزن kg</th><th>إجراء</th></tr></thead>
+<tbody id="rows"></tbody>
+</table>
+</div>
+</section>
+</main>
+<footer>Duct Quantity Calculator — يعمل بالكامل داخل المتصفح ولا يحتاج إلى خادم.</footer>
+<script>
+let items=JSON.parse(localStorage.getItem('ductItems')||'[]');
+
+function val(id){return Number(document.getElementById(id).value)||0}
+function addItem(){
+ const type=document.getElementById('type').value,w=val('w'),h=val('h'),d=val('d'),l=val('l'),qty=Math.max(1,val('qty')),th=val('thickness'),waste=val('waste'),ins=val('insulation');
+ if(l<=0 || (type==='rect' && (w<=0||h<=0)) || (type==='round' && d<=0)){alert('أدخل الأبعاد والطول بشكل صحيح.');return}
+ const areaOne=type==='rect'?2*((w+h)/1000)*l:Math.PI*(d/1000)*l;
+ const area=areaOne*qty, wasteArea=area*waste/100, total=area+wasteArea;
+ const perimeter=type==='rect'?2*((w+h)/1000):Math.PI*(d/1000);
+ const insArea=perimeter*l*qty;
+ const weight=total*(th/1000)*7850;
+ items.push({type,w,h,d,l,qty,th,waste,ins,area,wasteArea,total,insArea,weight});
+ save(); render(); clearForm();
+}
+function clearForm(){['w','h','d','l'].forEach(x=>document.getElementById(x).value='');document.getElementById('qty').value=1}
+function removeItem(i){items.splice(i,1);save();render()}
+function clearAll(){if(confirm('هل تريد حذف جميع البنود؟')){items=[];save();render()}}
+function save(){localStorage.setItem('ductItems',JSON.stringify(items))}
+function render(){
+ const tbody=document.getElementById('rows');tbody.innerHTML='';
+ items.forEach((x,i)=>{
+  const size=x.type==='rect'?`${x.w} × ${x.h} mm`:`Ø ${x.d} mm`;
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td>${i+1}</td><td>${x.type==='rect'?'مستطيل':'دائري'}</td><td>${size}</td><td>${x.l.toFixed(2)}</td><td>${x.qty}</td><td>${x.area.toFixed(2)}</td><td>${x.wasteArea.toFixed(2)}</td><td>${x.total.toFixed(2)}</td><td>${x.insArea.toFixed(2)}</td><td>${x.weight.toFixed(2)}</td><td><button class="danger" onclick="removeItem(${i})">حذف</button></td>`;
+  tbody.appendChild(tr);
+ });
+ let len=items.reduce((s,x)=>s+x.l*x.qty,0),area=items.reduce((s,x)=>s+x.area,0),waste=items.reduce((s,x)=>s+x.wasteArea,0),total=items.reduce((s,x)=>s+x.total,0),ins=items.reduce((s,x)=>s+x.insArea,0),weight=items.reduce((s,x)=>s+x.weight,0);
+ document.getElementById('mItems').textContent=items.length;
+ document.getElementById('mLength').textContent=len.toFixed(2)+' m';
+ document.getElementById('mArea').textContent=area.toFixed(2)+' m²';
+ document.getElementById('mWaste').textContent=waste.toFixed(2)+' m²';
+ document.getElementById('mTotal').textContent=total.toFixed(2)+' m²';
+ document.getElementById('mIns').textContent=ins.toFixed(2)+' m²';
+ document.getElementById('mWeight').textContent=weight.toFixed(2)+' kg';
+}
+function exportCSV(){
+ let lines=[['#','Type','Size','Length m','Qty','Area m2','Waste m2','Total m2','Insulation m2','Weight kg']];
+ items.forEach((x,i)=>lines.push([i+1,x.type==='rect'?'Rectangular':'Round',x.type==='rect'?`${x.w}x${x.h} mm`:`Ø${x.d} mm`,x.l,x.qty,x.area,x.wasteArea,x.total,x.insArea,x.weight]));
+ const csv='\ufeff'+lines.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(',')).join('\n');
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='duct-quantity-takeoff.csv';a.click();
+}
+render();
+</script>
+</body>
+</html>
